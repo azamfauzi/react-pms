@@ -60,19 +60,60 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+type ProjectMutation = {
+  name?: string;
+  status?: Project["status"];
+  progress?: number;
+  due_date?: string | null;
+};
+
+type TaskMutation = {
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  assignee_id?: number | null;
+  due_date?: string | null;
+};
+
 export const api = {
   listProjects: () => request<Project[]>("/api/projects"),
   getProject: (id: number | string) => request<Project>(`/api/projects/${id}`),
-  createProject: (body: {
-    name: string;
-    status?: Project["status"];
-    progress?: number;
-    due_date?: string | null;
-  }) =>
+  createProject: (body: ProjectMutation & { name: string }) =>
     request<Project>("/api/projects", {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  updateProject: (id: number | string, body: ProjectMutation) =>
+    request<Project>(`/api/projects/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteProject: (id: number | string) =>
+    request<{ deleted: boolean }>(`/api/projects/${id}`, { method: "DELETE" }),
+
+  createTask: (
+    projectId: number | string,
+    body: TaskMutation & { title: string },
+  ) =>
+    request<Task>(`/api/projects/${projectId}/tasks`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateTask: (
+    projectId: number | string,
+    taskId: number,
+    body: TaskMutation,
+  ) =>
+    request<Task>(`/api/projects/${projectId}/tasks/${taskId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  deleteTask: (projectId: number | string, taskId: number) =>
+    request<{ deleted: boolean }>(
+      `/api/projects/${projectId}/tasks/${taskId}`,
+      { method: "DELETE" },
+    ),
   reorderTasks: (
     projectId: number | string,
     tasks: { id: number; status: TaskStatus; position: number }[],
