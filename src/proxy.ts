@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const TOKEN_COOKIE = "auth_token";
-const PROTECTED_PREFIXES = ["/dashboard"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/projects",
+  "/calendar",
+  "/team",
+  "/settings",
+];
 const AUTH_PAGES = ["/login"];
 
 export function proxy(request: NextRequest) {
@@ -29,5 +35,12 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"],
+  matcher: [
+    "/dashboard/:path*",
+    "/projects/:path*",
+    "/calendar/:path*",
+    "/team/:path*",
+    "/settings/:path*",
+    "/login",
+  ],
 };
