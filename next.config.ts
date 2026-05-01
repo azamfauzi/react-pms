@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const LARAVEL_URL = process.env.LARAVEL_API_URL ?? "http://localhost:218";
+const LARAVEL_URL = process.env.LARAVEL_API_URL ?? "http://localhost:221";
 
 const nextConfig: NextConfig = {
   async rewrites() {
