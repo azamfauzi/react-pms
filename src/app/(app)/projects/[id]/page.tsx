@@ -1,7 +1,16 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  useDraggable,
+  useDroppable,
+} from "@dnd-kit/core";
 import { ArrowLeft, MoreHorizontal, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,65 +18,23 @@ import {
   Avatar,
   AvatarFallback,
 } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import { api, type Project, type Task, type TaskStatus } from "@/lib/api";
 
-type Priority = "low" | "med" | "high";
-
-type Task = {
-  id: string;
-  title: string;
-  assignee: string;
-  priority: Priority;
-  due?: string;
+const COLUMN_ORDER: TaskStatus[] = ["todo", "in_progress", "review", "done"];
+const COLUMN_TITLE: Record<TaskStatus, string> = {
+  todo: "To Do",
+  in_progress: "In Progress",
+  review: "In Review",
+  done: "Done",
 };
-
-type Column = {
-  id: "todo" | "in_progress" | "review" | "done";
-  title: string;
-  tasks: Task[];
-};
-
-const COLUMNS: Column[] = [
-  {
-    id: "todo",
-    title: "To Do",
-    tasks: [
-      { id: "T-101", title: "Draft homepage hero copy", assignee: "AS", priority: "med", due: "May 5" },
-      { id: "T-102", title: "Audit old blog posts for SEO", assignee: "MK", priority: "low" },
-      { id: "T-103", title: "Set up Cypress for E2E", assignee: "DN", priority: "high", due: "May 8" },
-    ],
-  },
-  {
-    id: "in_progress",
-    title: "In Progress",
-    tasks: [
-      { id: "T-104", title: "Migrate users table to UUID", assignee: "DN", priority: "high", due: "May 3" },
-      { id: "T-105", title: "Refactor auth middleware", assignee: "AS", priority: "med" },
-    ],
-  },
-  {
-    id: "review",
-    title: "In Review",
-    tasks: [
-      { id: "T-106", title: "Add pagination to projects list", assignee: "MK", priority: "med", due: "May 4" },
-    ],
-  },
-  {
-    id: "done",
-    title: "Done",
-    tasks: [
-      { id: "T-107", title: "Set up CI pipeline", assignee: "DN", priority: "high" },
-      { id: "T-108", title: "Brand colors finalised", assignee: "AS", priority: "low" },
-    ],
-  },
-];
-
-const PRIORITY_LABEL: Record<Priority, string> = {
+const PRIORITY_LABEL: Record<Task["priority"], string> = {
   low: "Low",
   med: "Medium",
   high: "High",
 };
 
-function PriorityBadge({ priority }: { priority: Priority }) {
+function PriorityBadge({ priority }: { priority: Task["priority"] }) {
   const variant =
     priority === "high"
       ? "destructive"
@@ -81,27 +48,85 @@ function PriorityBadge({ priority }: { priority: Priority }) {
   );
 }
 
-function TaskCard({ task }: { task: Task }) {
+function initials(name?: string | null): string {
+  if (!name) return "?";
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function DraggableTaskCard({ task }: { task: Task }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id.toString(),
+  });
   return (
-    <div className="cursor-pointer space-y-2 rounded-md border bg-card p-3 shadow-sm transition hover:border-primary/40">
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`space-y-2 rounded-md border bg-card p-3 shadow-sm transition hover:border-primary/40 ${isDragging ? "opacity-40" : ""}`}
+      style={{ touchAction: "none" }}
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm font-medium leading-snug">{task.title}</p>
-        <button className="text-muted-foreground hover:text-foreground">
+        <button
+          className="text-muted-foreground hover:text-foreground"
+          onClick={(e) => e.stopPropagation()}
+        >
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <PriorityBadge priority={task.priority} />
-          {task.due && (
-            <span className="text-[11px] text-muted-foreground">{task.due}</span>
+          {task.due_date && (
+            <span className="text-[11px] text-muted-foreground">
+              {task.due_date}
+            </span>
           )}
         </div>
         <Avatar className="h-6 w-6">
-          <AvatarFallback className="text-[10px]">{task.assignee}</AvatarFallback>
+          <AvatarFallback className="text-[10px]">
+            {initials(task.assignee?.name)}
+          </AvatarFallback>
         </Avatar>
       </div>
-      <p className="font-mono text-[10px] text-muted-foreground">{task.id}</p>
+      <p className="font-mono text-[10px] text-muted-foreground">T-{task.id}</p>
+    </div>
+  );
+}
+
+function Column({
+  status,
+  tasks,
+}: {
+  status: TaskStatus;
+  tasks: Task[];
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: status });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex flex-col gap-3 rounded-lg border bg-muted/40 p-3 transition ${isOver ? "border-primary/60 bg-primary/5" : ""}`}
+    >
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold">{COLUMN_TITLE[status]}</h2>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+            {tasks.length}
+          </span>
+        </div>
+        <button className="text-muted-foreground hover:text-foreground">
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="flex min-h-[60px] flex-col gap-2">
+        {tasks.map((task) => (
+          <DraggableTaskCard key={task.id} task={task} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -112,6 +137,81 @@ export default function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const [project, setProject] = useState<Project | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
+
+  useEffect(() => {
+    api
+      .getProject(id)
+      .then((p) => {
+        setProject(p);
+        setTasks(p.tasks ?? []);
+      })
+      .catch((err: Error) => setError(err.message));
+  }, [id]);
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over) return;
+
+    const taskId = Number(active.id);
+    const newStatus = over.id as TaskStatus;
+    const moving = tasks.find((t) => t.id === taskId);
+    if (!moving || moving.status === newStatus) return;
+
+    const others = tasks.filter((t) => t.id !== taskId);
+    const inTarget = others.filter((t) => t.status === newStatus);
+    const updated: Task = {
+      ...moving,
+      status: newStatus,
+      position: inTarget.length,
+    };
+    const next = [...others, updated];
+    setTasks(next);
+
+    const payload = COLUMN_ORDER.flatMap((col) =>
+      next
+        .filter((t) => t.status === col)
+        .sort((a, b) => a.position - b.position)
+        .map((t, idx) => ({ id: t.id, status: col, position: idx })),
+    );
+
+    api.reorderTasks(id, payload).catch((err: Error) => {
+      setError(err.message);
+    });
+  }
+
+  if (error) {
+    return (
+      <Card className="border-destructive/50 bg-destructive/5">
+        <CardContent className="pt-6 text-sm text-destructive">
+          {error}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!project) {
+    return (
+      <p className="text-sm text-muted-foreground">Loading project…</p>
+    );
+  }
+
+  const grouped: Record<TaskStatus, Task[]> = {
+    todo: [],
+    in_progress: [],
+    review: [],
+    done: [],
+  };
+  for (const t of tasks) grouped[t.status].push(t);
+  for (const col of COLUMN_ORDER) {
+    grouped[col].sort((a, b) => a.position - b.position);
+  }
 
   return (
     <div className="space-y-6">
@@ -125,10 +225,10 @@ export default function ProjectDetailPage({
             Projects
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Project {id}
+            {project.name}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Drag-and-drop kanban for your team&apos;s work in progress.
+            Drag cards between columns to update status.
           </p>
         </div>
         <Button>
@@ -137,31 +237,13 @@ export default function ProjectDetailPage({
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {COLUMNS.map((col) => (
-          <div
-            key={col.id}
-            className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-3"
-          >
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold">{col.title}</h2>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                  {col.tasks.length}
-                </span>
-              </div>
-              <button className="text-muted-foreground hover:text-foreground">
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex flex-col gap-2">
-              {col.tasks.map((task) => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {COLUMN_ORDER.map((status) => (
+            <Column key={status} status={status} tasks={grouped[status]} />
+          ))}
+        </div>
+      </DndContext>
     </div>
   );
 }

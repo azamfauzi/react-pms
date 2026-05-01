@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,33 +19,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { api, type Project } from "@/lib/api";
+import { NewProjectDialog } from "@/components/new-project-dialog";
 
-type Status = "active" | "on_hold" | "completed";
-
-type Project = {
-  id: string;
-  name: string;
-  owner: string;
-  status: Status;
-  progress: number;
-  due: string;
-};
-
-const PROJECTS: Project[] = [
-  { id: "PRJ-001", name: "Website Revamp", owner: "Aiman", status: "active", progress: 62, due: "2026-06-15" },
-  { id: "PRJ-002", name: "Mobile App v2", owner: "Sarah", status: "active", progress: 28, due: "2026-08-30" },
-  { id: "PRJ-003", name: "API Migration", owner: "Daniel", status: "on_hold", progress: 45, due: "2026-07-10" },
-  { id: "PRJ-004", name: "Investor Portal", owner: "Aiman", status: "completed", progress: 100, due: "2026-04-01" },
-  { id: "PRJ-005", name: "Analytics Dashboard", owner: "Mei", status: "active", progress: 80, due: "2026-05-20" },
-];
-
-const STATUS_LABEL: Record<Status, string> = {
+const STATUS_LABEL: Record<Project["status"], string> = {
   active: "Active",
   on_hold: "On Hold",
   completed: "Completed",
 };
 
-function StatusBadge({ status }: { status: Status }) {
+function StatusBadge({ status }: { status: Project["status"] }) {
   const variant =
     status === "completed"
       ? "secondary"
@@ -55,6 +39,22 @@ function StatusBadge({ status }: { status: Status }) {
 }
 
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  async function load() {
+    try {
+      setProjects(await api.listProjects());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load projects");
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -64,11 +64,25 @@ export default function ProjectsPage() {
             All projects across your team.
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           New project
         </Button>
       </div>
+
+      <NewProjectDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onCreated={load}
+      />
+
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="pt-6 text-sm text-destructive">
+            {error}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -87,48 +101,62 @@ export default function ProjectsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {PROJECTS.map((p) => (
-                <TableRow
-                  key={p.id}
-                  className="cursor-pointer"
-                  onClick={() => {
-                    window.location.href = `/projects/${p.id}`;
-                  }}
-                >
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {p.id}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/projects/${p.id}`}
-                      className="hover:underline"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {p.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{p.owner}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={p.status} />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 flex-1 overflow-hidden rounded bg-muted">
-                        <div
-                          className="h-full bg-primary"
-                          style={{ width: `${p.progress}%` }}
-                        />
-                      </div>
-                      <span className="w-9 text-right text-xs text-muted-foreground">
-                        {p.progress}%
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {p.due}
+              {projects === null ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                    Loading…
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : projects.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                    No projects yet. Click &ldquo;New project&rdquo; to create one.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                projects.map((p) => (
+                  <TableRow
+                    key={p.id}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      window.location.href = `/projects/${p.id}`;
+                    }}
+                  >
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      PRJ-{String(p.id).padStart(3, "0")}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="hover:underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {p.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{p.owner?.name ?? "—"}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={p.status} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 flex-1 overflow-hidden rounded bg-muted">
+                          <div
+                            className="h-full bg-primary"
+                            style={{ width: `${p.progress}%` }}
+                          />
+                        </div>
+                        <span className="w-9 text-right text-xs text-muted-foreground">
+                          {p.progress}%
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {p.due_date ?? "—"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
