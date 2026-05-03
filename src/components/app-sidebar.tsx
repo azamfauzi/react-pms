@@ -8,6 +8,7 @@ import {
   Calendar,
   Users,
   Settings,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,7 @@ const NAV = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/team", label: "Team", icon: Users },
+  { href: "/widgets/advanced", label: "Widgets", icon: LayoutGrid },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
