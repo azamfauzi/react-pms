@@ -104,10 +104,8 @@ function TaskCardBody({
         {(onEdit || onDelete) && (
           <div onPointerDown={(e) => e.stopPropagation()}>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="text-muted-foreground hover:text-foreground">
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
+              <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground">
+                <MoreHorizontal className="h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {onEdit && (
@@ -447,10 +445,8 @@ export default function ProjectDetailPage({
             Add task
           </Button>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+            <DropdownMenuTrigger className="inline-flex size-8 items-center justify-center rounded-lg border border-border bg-background text-sm hover:bg-muted hover:text-foreground">
+              <MoreHorizontal className="h-4 w-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setProjectDialogOpen(true)}>
