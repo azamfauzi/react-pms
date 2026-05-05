@@ -8,7 +8,7 @@ const PROTECTED_PREFIXES = [
   "/team",
   "/settings",
 ];
-const AUTH_PAGES = ["/login"];
+const AUTH_PAGES = ["/"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -19,7 +19,7 @@ export function proxy(request: NextRequest) {
   );
   if (isProtected && !token) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
@@ -36,11 +36,11 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/",
     "/dashboard/:path*",
     "/projects/:path*",
     "/calendar/:path*",
     "/team/:path*",
     "/settings/:path*",
-    "/login",
   ],
 };

@@ -14,7 +14,7 @@ export function AppTopbar() {
 
   async function handleLogout() {
     await logout();
-    router.replace("/login");
+    router.replace("/");
   }
 
   return (

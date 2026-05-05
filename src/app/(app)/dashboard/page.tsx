@@ -25,7 +25,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!getToken()) {
-      router.replace("/login");
+      router.replace("/");
       return;
     }
     fetchUser()
@@ -33,7 +33,7 @@ export default function DashboardPage() {
       .catch((err: Error) => {
         setError(err.message);
         if (err.message.toLowerCase().includes("unauthenticated")) {
-          router.replace("/login");
+          router.replace("/");
         }
       });
   }, [router]);
